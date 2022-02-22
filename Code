@@ -1,0 +1,138 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+diabetes = pd_read.csv('https://raw.githubusercontent.com/ammishra08/MachineLearning/master/Datasets/diabetes.csv.read_csv', sep = ',')
+
+diabetes.head()
+
+diabetes.isnull().sum()
+
+data_raw = diabetes.drop(['Pregnancies', 'Outcome'], axis = 1)
+
+# Replace 0 by nan
+data_raw.replace(0, np.nan, inplace = True)
+
+data_raw.info()
+
+data_raw.isnull().sum().sort_values(ascending = False)
+
+# If data is continious replace by mean/median, if data is discrete replace by median or mode.
+data_raw['Insulin'].unique()
+
+np.round(data_raw['Insulin'].mean())
+
+data_raw['Insulin'].replace(np.nan, np.round(data_raw['Insulin'].mean()), inplace = True)
+
+data_raw.isnull().sum().sort_values(ascending = False)
+
+data_raw['SkinThickness'].unique()
+
+from sklearn.impute import SimpleImputer
+# strategy = 'median', 'mean', 'most_frequent'
+impute = SimpleImputer(strategy = 'median')
+data_array = impute.fit_transform(data_raw)
+
+data_array
+
+diabetes_df = pd.DataFrame(data_array, columns = data_raw.columns)
+
+diabetes_df.isnull().sum()
+
+diabetes_df['Pregnancies'] = diabetes.Pregnancies
+diabetes_df['Outcome'] = diabetes.Outcome
+
+sns.catplot(x = "Outcome", kind = 'count', data = diabetes_df, palette = 'magma')
+
+diabetes_df['Outcome'].value_counts()
+
+# Resample using "Bootstrapping" method to regenerate samples by upsampling for each class.
+from sklearn.utils import resample
+df_0 = diabetes_df[diabetes_df['Outcome'] == 0]
+df_1 = diabetes_df[diabetes_df['Outcome'] == 1]
+
+# Apply Resampling 
+df_1_upsample = resample(df_1, n_samples = 500, replace = True, random_state = 123)
+
+diabetes_df1 = pd.concat([df_0, df_1_upsample])
+
+sns.catplot(x = "Outcome", kind = 'count', data = diabetes_df1, palette = 'magma')
+
+plt.figure(figsize = (13,8))
+sns.heatmap(diabetes_df1.corr(), annot = True, cmap = 'RdYlGn')
+
+X = diabetes_df1.drop(['Outcome'], axis = 1)
+Y = diabetes_df1['Outcome']
+
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size = 0.2, random_state = 3)
+
+# Normalization the Features
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler(feature_range = (0,1))
+x_train_scaler = scaler.fit_transform(x_train)
+
+x_test_scaler = scaler.transform(x_test)
+
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+
+def build_model():
+    # Sequential Neural Network - FeedForward NN
+    model = Sequential()
+    # Units = Num of Neurons (2 * pow(n)), input shape = num of features.
+    model.add(Dense(units = 64, activation = 'relu', input_shape = [len(X.keys())]))
+    model.add(Dropout(0.2))
+    # Hidden Layer - I
+    model.add(Dense(units = 128, activation = 'relu'))
+    model.add(Dropout(0.2))
+    # Hidden Layer - II
+    model.add(Dense(units = 128, activation = 'relu'))
+    model.add(Dropout(0.2))
+    # Output Layer - Binary Class Classification
+    model.add(Dense(units = 1, activation='sigmoid'))
+    
+    # Optimizers - To converge the loss
+    optimizers = Adam(learning_rate = 0.001)
+
+    # Model Compiler
+    model.compile(loss = 'binary_crossentropy', optimizer = optimizers, metrics = ['accuracy'])
+    return model
+
+model = build_model()
+
+model.summary()
+
+# epochs = Number of Iterations
+# batch size = samples per steps in each epochs
+history = model.fit(x_train_scaler, y_train, epochs = 350, batch_size = 20, validation_split = 0.2)
+
+pd.DataFrame(history.history)
+
+pd.DataFrame(history.history)[['accuracy','val_accuracy']].plot(figsize = (7,6))
+
+model.evaluate(x_test_scaler, y_test)
+
+predict = model.predict(x_test_scaler)     # Predictions are in probability
+
+display(predict)
+
+yhat = np.round(predict)
+
+from sklearn.metrics import confusion_matrix
+# matrix b/w true predictions and false prediction
+confusion_matrix(y_test, yhat)
+
+sns.heatmap(confusion_matrix(y_test, yhat), annot = True)
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test, yhat))
+
+
+
+
+
+
+
